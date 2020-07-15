@@ -19,8 +19,23 @@ class ResNet(nn.Module):
         self.end = nn.Sequential(
             nn.AdaptiveMaxPool2d((1, 1)),
             nn.Flatten(),
-            nn.Linaer(512, nclasses)
+            nn.Linear(512, nclasses)
         )
+
+    def init_weights(self):
+        def initialiser(m):
+            if type(m) == nn.Conv2d or type(m) == nn.Linear:
+                torch.nn.init.xavier_normal_(m.weight)
+        self.apply(initialiser)
+
+    def forward(self, X):
+        X = self.initial(X)
+        X = self.res1(X)
+        X = self.res2(X)
+        X = self.res3(X)
+        X = self.res4(X)
+        Y = self.end(X)
+        return Y
 
 
 class ResNetBlock(nn.Module):
@@ -35,22 +50,23 @@ class ResNetBlock(nn.Module):
                 blocks += [ResidualBlock(input_channels, output_channels,
                                          stride=2, use1x1=True)]
             else:
-                blocks += [ResidualBlock(input_channels, output_channels)]
+                blocks += [ResidualBlock(output_channels, output_channels)]
 
         self.net = nn.Sequential(*blocks)
 
-        def forward(self, X):
-            return self.net(X)
+    def forward(self, X):
+        return self.net(X)
 
 
 class ResidualBlock(nn.Module):
     """Module for single residual block in ResNet."""
 
-    def __init__(self, input_channels, output_channels, stride=1, use1x1=False):
+    def __init__(self, input_channels, output_channels,
+                 stride=1, use1x1=False):
         super().__init__()
         self.conv1 = nn.Conv2d(input_channels, output_channels,
                                kernel_size=3, padding=1, stride=stride)
-        self.conv2 = nn.Conv2d(output_channels, output_channels
+        self.conv2 = nn.Conv2d(output_channels, output_channels,
                                kernel_size=3, padding=1)
         if use1x1:
             # 1x1 convolution for the skip connection
@@ -74,3 +90,10 @@ class ResidualBlock(nn.Module):
         Y += self.conv3(X)
         Y = self.prelu2(Y)
         return Y
+
+
+if __name__ == "__main__":
+    test_model = ResNet(10)
+    test_model.init_weights()
+    # print(test_model)
+    print(test_model(torch.randn(2, 1, 200, 200)))
