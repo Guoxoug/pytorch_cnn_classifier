@@ -12,8 +12,7 @@ class ResNet(nn.Module):
             nn.BatchNorm2d(64), nn.ReLU(),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         )
-        self.res1 = ResNetBlock(64, 64, 2, first=True)
-        self.res2 = ResNetBlock(64, 128, 2)
+        self.res2 = ResNetBlock(64, 128, 2, first=True)
         self.res3 = ResNetBlock(128, 256, 2)
         self.res4 = ResNetBlock(256, 512, 2)
         self.end = nn.Sequential(
