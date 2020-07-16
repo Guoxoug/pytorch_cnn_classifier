@@ -8,18 +8,21 @@ class ResNet(nn.Module):
     def __init__(self, nclasses, nblock_layers=2):
         super().__init__()
         self.initial = nn.Sequential(
-            nn.Conv2d(3, 128, kernel_size=7, stride=2, padding=3),
-            nn.BatchNorm2d(128), nn.ReLU(),
-            nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+            nn.Conv2d(3, 16, kernel_size=7, stride=1, padding=3),
+            nn.BatchNorm2d(16), nn.ReLU(),
         )
-        self.res1 = ResNetBlock(128, 128, nblock_layers, first=True)
-        self.res2 = ResNetBlock(128, 256, nblock_layers)
-        self.res3 = ResNetBlock(256, 512, nblock_layers)
+        self.res1 = ResNetBlock(16, 16, nblock_layers, first=True)
+        self.res2 = ResNetBlock(16, 16, nblock_layers)
+        self.res3 = ResNetBlock(16, 32, nblock_layers)
+        self.res4 = ResNetBlock(32, 64, nblock_layers)
         self.end = nn.Sequential(
             nn.AdaptiveMaxPool2d((1, 1)),
             nn.Flatten(),
-            nn.Linear(512, nclasses)
+            nn.Linear(64, nclasses)
         )
+
+        self.init_weights()
+        
 
     def init_weights(self):
         def initialiser(m):
@@ -32,6 +35,7 @@ class ResNet(nn.Module):
         X = self.res1(X)
         X = self.res2(X)
         X = self.res3(X)
+        X = self.res4(X)
         Y = self.end(X)
         return Y
 
