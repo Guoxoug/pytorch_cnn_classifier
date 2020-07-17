@@ -42,7 +42,8 @@ class Pruner:
         prune_schedule=schedule
     ):
         self.targets = targets
-        # targets need to be in the form
+        # targets need to be in the form (module, name)
+        # weights must be direct attributes of module (and not of its children)
         self.total_pruning_steps = pruning_steps
         self.start_step = start_step
         self.steps_taken = 0
@@ -73,10 +74,16 @@ class Pruner:
             delta_sparsity = (target_sparsity - self.current_sparsity)/(1
                                                     - self.current_sparsity)
             self.current_sparsity = target_sparsity
+            print(f"current sparsity: {target_sparsity:.3f}", " | ",
+                  f"delta sparsity  : {delta_sparsity:.3f}")
 
             # actual pruning 
             for model, params in self.targets:
                 self.prune_method(model, params, delta_sparsity)
+  
+
+                
+            
 
     @property
     def done_pruning(self):

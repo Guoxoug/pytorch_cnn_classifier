@@ -12,8 +12,8 @@ class ResNet(nn.Module):
             nn.BatchNorm2d(16), nn.ReLU(),
         )
         self.res1 = ResNetBlock(16, 16, nblock_layers, first=True)
-        self.res2 = ResNetBlock(16, 16, nblock_layers)
-        self.res3 = ResNetBlock(16, 32, nblock_layers)
+        self.res2 = ResNetBlock(16, 32, nblock_layers)
+        self.res3 = ResNetBlock(32, 32, nblock_layers)
         self.res4 = ResNetBlock(32, 64, nblock_layers)
         self.end = nn.Sequential(
             nn.AdaptiveMaxPool2d((1, 1)),

@@ -7,9 +7,9 @@ import PIL
 import matplotlib.pyplot as plt
 import numpy as np
 import torch.nn.utils.prune as prune
-from prune import Pruner
+from pruning import Pruner
 
-TRAIN_BATCH_SIZE = 128
+TRAIN_BATCH_SIZE = 100
 
 EVAL_BATCH_SIZE = 128
 
@@ -64,8 +64,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # ------------------------------------------------------------------------------
 # training
 
-epochs = 30
-model = ResNet(10, nblock_layers=7).to(device)
+epochs = 25
+model = ResNet(10, nblock_layers=5).to(device)
 criterion = nn.CrossEntropyLoss()
 lr = 0.01
 optimiser = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.0001)
@@ -75,15 +75,20 @@ should_prune = True
 # pruning stuff
 
 # only prune weights not biases
-pruning_targets = [(model, param) for param 
-                   in dict(model.named_parameters()).keys()
-                   if "weight" in param]
+# exclude batch norm layers
+submodules = [submodule for name, submodule in model.named_modules()
+              if type(submodule) != nn.BatchNorm2d]
+targets = []
+for submodule in submodules:
+    for name, _ in submodule.named_parameters(recurse=False):
+        if "weight" in name:
+            targets.append((submodule, name))
 
 pruning_frequency = 100
 training_steps = epochs * len(trainloader)
-pruning_steps = training_steps * 0.7 // pruning_frequency
+pruning_steps = training_steps * 0.5 // pruning_frequency
 start_step = training_steps * 0.1 // pruning_frequency
-pruner = Pruner(pruning_targets, pruning_steps, start_step=0, final_sparsity=0.6)
+pruner = Pruner(targets, pruning_steps, start_step=0, final_sparsity=0.75)
 
 
 def train():
@@ -153,12 +158,12 @@ def accuracy(outputs, labels):
 
 
 if __name__ == "__main__":
-    with open('model.pt', "wb") as file:
-        torch.save(model, file)
+
     best_loss = None
+    pruned_best_loss = None
     try:
         for epoch in range(1, epochs+1):
-            print("="*80) 
+            print("="*80)
             print(f"epoch {epoch}")
             for params in optimiser.param_groups:
                 print(f"learning rate: {params['lr']}", sep=" | ")
@@ -166,31 +171,64 @@ if __name__ == "__main__":
             val_loss = evaluate()
 
             # save the best model
+
             if not best_loss or val_loss < best_loss:
                 best_loss = val_loss
-                with open('model.pt', "wb") as file:
-                    torch.save(model, file)
+                if not should_prune:
+                    with open('model.pt', "wb") as file:
+                        torch.save(model, file)
+                else:
+                    # we only want to save if it's done pruning to the desired 
+                    # sparsity
+                    if pruner.done_pruning:
+                        if not pruned_best_loss or val_loss < pruned_best_loss:
+                            pruned_best_loss = val_loss
+                            with open('model.pt', "wb") as file:
+                                torch.save(model, file)
             else:
                 # decay learning rate if no improvement
                 scheduler.step()
                 lr = optimiser.param_groups
 
     except KeyboardInterrupt:
-        print("-"*80)
+        print("-"*80, "\n")
         print("exiting early")
 
+    # load the best model
     with open("model.pt", 'rb') as file:
         model = torch.load(file, map_location=device)
-        # after load the rnn params are not a continuous chunk of memory
-        # this makes them a continuous chunk, and will speed up forward pass
-        # Currently, only rnn model supports flatten_parameters function.
+  
 
     # Finalise model pruning (i.e. setting parameters to 0)
+    # Removes mask and fixes parameters to zero
+
+    # Needs to re-register the nn.Module objects as this is 
+    # a new model has been loaded into memory
+    submodules = [submodule for name, submodule in model.named_modules()
+                  if type(submodule) != nn.BatchNorm2d]
+    targets = []
+    for submodule in submodules:
+        for name, _ in submodule.named_parameters(recurse=False):
+            if "weight" in name:
+                targets.append((submodule, name))
     if should_prune:
-        for module, params in pruning_targets:
+        for module, params in targets:
+            mask = dict(module.named_buffers())["weight_mask"]
+            print((mask == 0).sum())
             prune.remove(module, params)
+        model._apply(lambda x: x)
         # Re-register the pruned parameters correctly
         # https://github.com/pytorch/pytorch/issues/33618
-        model._apply(lambda x: x)
+        
         with open("model.pt", 'wb') as f:
             torch.save(model, f)
+    # parameters = torch.cat([param.data.flatten()
+    #                         for param in list(model.parameters())])
+
+    parameters = model.initial[0].weight.data.view(-1)
+
+    sparsity = float((parameters == 0.0).sum())/len(parameters)
+    print(targets[:2])
+    print(parameters)
+    print(f"final sparsity: {sparsity}")
+    print(f"reported by pruner: {pruner.current_sparsity}")
