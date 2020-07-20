@@ -14,7 +14,7 @@ warnings.simplefilter("once")
 
 
 def schedule(
-    initial_sparsity, final_sparsity, 
+    initial_sparsity, final_sparsity,
     step, total_steps, start_step=0
 ):
     """Compute desired sparsity of next step."""
@@ -72,18 +72,15 @@ class Pruner:
                 self.start_step
             )
             delta_sparsity = (target_sparsity - self.current_sparsity)/(1
-                                                    - self.current_sparsity)
+                                                                        - self.current_sparsity)
             self.current_sparsity = target_sparsity
-            print(f"current sparsity: {target_sparsity:.3f}", " | ",
+            print("-"*80 +"\n",
+                  f"current sparsity: {target_sparsity:.3f}", " | ",
                   f"delta sparsity  : {delta_sparsity:.3f}")
 
-            # actual pruning 
+            # actual pruning
             for model, params in self.targets:
                 self.prune_method(model, params, delta_sparsity)
-  
-
-                
-            
 
     @property
     def done_pruning(self):
