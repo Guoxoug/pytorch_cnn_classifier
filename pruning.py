@@ -72,9 +72,9 @@ class Pruner:
                 self.start_step
             )
             delta_sparsity = (target_sparsity - self.current_sparsity)/(1
-                                                                        - self.current_sparsity)
+                                                        - self.current_sparsity)
             self.current_sparsity = target_sparsity
-            print("-"*80 +"\n",
+            print("-"*80 + "\n",
                   f"current sparsity: {target_sparsity:.3f}", " | ",
                   f"delta sparsity  : {delta_sparsity:.3f}")
 
