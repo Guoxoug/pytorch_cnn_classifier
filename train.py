@@ -1,4 +1,5 @@
 from model import ResNet
+from quant_model import QuantResNet
 import torch
 import torch.nn as nn
 import torchvision
@@ -12,7 +13,7 @@ from pruning import Pruner
 import wandb
 wandb.init(
     project="trying-things-out",
-    name="second attempt",
+    name="quantised skip at fp32, fixed again",
     notes="25 epochs, 0.75 sparsity")
 
 TRAIN_BATCH_SIZE = 100
@@ -71,14 +72,19 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # training
 
 epochs = 25
-model = ResNet(10, nblock_layers=5).to(device)
+# model = ResNet(10, nblock_layers=5).to(device)
+model = QuantResNet(10, nblock_layers=5).to(device)
 
 # Log metrics with wandb
 wandb.watch(model)
 
 criterion = nn.CrossEntropyLoss()
 lr = 0.01
-optimiser = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.0001)
+# optimiser = torch.optim.SGD(model.parameters(),
+                            # lr=lr,
+                            # weight_decay=0.0001,
+                            # momentum=0.9)
+optimiser = torch.optim.Adam(model.parameters(), lr=lr)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimiser, 0.5)
 should_prune = True
 
@@ -104,7 +110,7 @@ targets = get_targets(model)
 
 pruning_frequency = 100
 training_steps = epochs * len(trainloader)
-pruning_steps = training_steps * 0.5 // pruning_frequency
+pruning_steps = training_steps * 0.7 // pruning_frequency
 start_step = training_steps * 0.1 // pruning_frequency
 pruner = Pruner(targets, pruning_steps, start_step=start_step,
                 final_sparsity=0.75)
@@ -210,16 +216,16 @@ if __name__ == "__main__":
                         torch.save(model, file)
                         print("-"*80)
                         print("best model saved")
-                else:
-                    # we only want to save if it's done pruning to the desired
-                    # sparsity
-                    if pruner.done_pruning:
-                        if not pruned_best_loss or val_loss < pruned_best_loss:
-                            pruned_best_loss = val_loss
-                            with open('model.pt', "wb") as file:
-                                torch.save(model, file)
-                                print("-"*80)
-                                print("best pruned model saved")
+            else:
+                # we only want to save if it's done pruning to the desired
+                # sparsity
+                if pruner.done_pruning:
+                    if not pruned_best_loss or val_loss < pruned_best_loss:
+                        pruned_best_loss = val_loss
+                        with open('model.pt', "wb") as file:
+                            torch.save(model, file)
+                            print("-"*80)
+                            print("best pruned model saved")
             else:
                 # decay learning rate if no improvement
                 scheduler.step()
@@ -254,6 +260,7 @@ if __name__ == "__main__":
 
         with open("model.pt", 'wb') as f:
             torch.save(model, f)
+            torch.save(model.state_dict(), "model_state_dict.pt")
     # parameters = torch.cat([param.data.flatten()
     #                         for param in list(model.parameters())])
 

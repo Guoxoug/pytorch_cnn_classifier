@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+# needed to collect statistics for quantisation
 
 
 class ResNet(nn.Module):
@@ -13,14 +14,13 @@ class ResNet(nn.Module):
         )
         self.res1 = ResNetBlock(16, 16, nblock_layers, first=True)
         self.res2 = ResNetBlock(16, 32, nblock_layers)
-        self.res3 = ResNetBlock(32, 32, nblock_layers)
-        self.res4 = ResNetBlock(32, 64, nblock_layers)
+        self.res3 = ResNetBlock(32, 64, nblock_layers)
+        self.res4 = ResNetBlock(64, 64, nblock_layers)
         self.end = nn.Sequential(
             nn.AdaptiveMaxPool2d((1, 1)),
             nn.Flatten(),
             nn.Linear(64, nclasses)
         )
-
         self.init_weights()
         
 
