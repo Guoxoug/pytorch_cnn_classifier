@@ -16,9 +16,9 @@ wandb.init(
     name="quantised skip at fp32, fixed again",
     notes="25 epochs, 0.75 sparsity")
 
-TRAIN_BATCH_SIZE = 100
+TRAIN_BATCH_SIZE = 64
 
-EVAL_BATCH_SIZE = 128
+EVAL_BATCH_SIZE = 64
 
 # images are 32x32
 # flip randomly for hopefully added robustness
@@ -65,7 +65,7 @@ classes = ('plane', 'car', 'bird', 'cat',
            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
 # if cuda is available use it
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 # ------------------------------------------------------------------------------
@@ -76,7 +76,7 @@ epochs = 25
 model = QuantResNet(10, nblock_layers=5).to(device)
 
 # Log metrics with wandb
-wandb.watch(model)
+# wandb.watch(model)
 
 criterion = nn.CrossEntropyLoss()
 lr = 0.01
@@ -217,20 +217,18 @@ if __name__ == "__main__":
                         print("-"*80)
                         print("best model saved")
             else:
-                # we only want to save if it's done pruning to the desired
-                # sparsity
-                if pruner.done_pruning:
-                    if not pruned_best_loss or val_loss < pruned_best_loss:
-                        pruned_best_loss = val_loss
-                        with open('model.pt', "wb") as file:
-                            torch.save(model, file)
-                            print("-"*80)
-                            print("best pruned model saved")
-            else:
                 # decay learning rate if no improvement
                 scheduler.step()
                 lr = optimiser.param_groups
-
+            # we only want to save if it's done pruning to the desired
+            # sparsity
+            if should_prune and pruner.done_pruning:
+                if not pruned_best_loss or val_loss < pruned_best_loss:
+                    pruned_best_loss = val_loss
+                    with open('model.pt', "wb") as file:
+                        torch.save(model, file)
+                        print("-"*80)
+                        print("best pruned model saved")
     except KeyboardInterrupt:
         print("-"*80, "\n")
         print("exiting early")
